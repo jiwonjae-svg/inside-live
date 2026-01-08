@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>로컬 데이터 복원</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+    .info {
+      background: #e3f2fd;
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+      border-left: 4px solid #2196F3;
+    }
+    .warning {
+      background: #fff3cd;
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+      border-left: 4px solid #ffc107;
+    }
+    button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-right: 10px;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .danger {
+      background: #f44336;
+    }
+    .danger:hover {
+      background: #da190b;
+    }
+    .log {
+      background: #f5f5f5;
+      padding: 15px;
+      border-radius: 5px;
+      margin-top: 20px;
+      max-height: 400px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    .log-entry {
+      margin-bottom: 5px;
+    }
+    .log-success {
+      color: #4CAF50;
+    }
+    .log-error {
+      color: #f44336;
+    }
+    .log-info {
+      color: #2196F3;
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      box-sizing: border-box;
+    }
+    label {
+      display: block;
+      margin-top: 10px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📦 로컬 데이터 MongoDB 복원</h1>
+    
+    <div class="info">
+      <strong>ℹ️ 사용 방법:</strong>
+      <ol>
+        <li>먼저 관리자 계정으로 로그인하여 JWT 토큰을 받으세요</li>
+        <li>아래에 토큰을 입력하세요</li>
+        <li>"로컬 데이터 복원" 버튼을 클릭하면 localStorage의 게시글들이 MongoDB에 저장됩니다</li>
+      </ol>
+    </div>
+
+    <div class="warning">
+      <strong>⚠️ 주의사항:</strong>
+      <ul>
+        <li>이 작업은 한 번만 실행하세요</li>
+        <li>복원된 게시글의 작성자는 현재 로그인한 사용자로 설정됩니다</li>
+        <li>댓글과 좋아요 정보도 함께 복원됩니다</li>
+      </ul>
+    </div>
+
+    <div>
+      <label for="token">JWT 토큰:</label>
+      <input 
+        type="text" 
+        id="token" 
+        placeholder="로그인 후 받은 토큰을 여기에 붙여넣으세요"
+      />
+    </div>
+
+    <div style="margin-top: 20px;">
+      <button onclick="restoreData()">📤 로컬 데이터 복원</button>
+      <button onclick="checkLocalData()">🔍 로컬 데이터 확인</button>
+      <button class="danger" onclick="clearLogs()">🗑️ 로그 지우기</button>
+    </div>
+
+    <div id="log" class="log" style="display: none;"></div>
+  </div>
+
+  <script>
+    const API_URL = 'http://localhost:5000';
+    const logContainer = document.getElementById('log');
+
+    function log(message, type = 'info') {
+      logContainer.style.display = 'block';
+      const entry = document.createElement('div');
+      entry.className = `log-entry log-${type}`;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      logContainer.appendChild(entry);
+      logContainer.scrollTop = logContainer.scrollHeight;
+    }
+
+    function clearLogs() {
+      logContainer.innerHTML = '';
+      logContainer.style.display = 'none';
+    }
+
+    function checkLocalData() {
+      clearLogs();
+      
+      const posts = JSON.parse(localStorage.getItem('allInitialPosts') || '[]');
+      
+      if (posts.length === 0) {
+        log('로컬에 저장된 게시글이 없습니다.', 'error');
+        return;
+      }
+
+      log(`총 ${posts.length}개의 게시글을 발견했습니다.`, 'success');
+      
+      posts.forEach((post, index) => {
+        log(`${index + 1}. "${post.title}" - 작성자: ${post.author}, 댓글: ${post.comments?.length || 0}개`, 'info');
+      });
+    }
+
+    async function restoreData() {
+      const token = document.getElementById('token').value.trim();
+      
+      if (!token) {
+        alert('JWT 토큰을 입력해주세요.');
+        return;
+      }
+
+      clearLogs();
+      log('복원 작업을 시작합니다...', 'info');
+
+      const posts = JSON.parse(localStorage.getItem('allInitialPosts') || '[]');
+      
+      if (posts.length === 0) {
+        log('로컬에 저장된 게시글이 없습니다.', 'error');
+        alert('복원할 게시글이 없습니다.');
+        return;
+      }
+
+      log(`총 ${posts.length}개의 게시글을 복원합니다.`, 'info');
+
+      let successCount = 0;
+      let failCount = 0;
+
+      for (let i = 0; i < posts.length; i++) {
+        const post = posts[i];
+        
+        try {
+          log(`[${i + 1}/${posts.length}] "${post.title}" 복원 중...`, 'info');
+
+          const response = await fetch(`${API_URL}/api/posts`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              title: post.title,
+              content: post.content,
+              category: post.category || 'comic',
+              media: post.media || []
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          const data = await response.json();
+          
+          // 댓글 복원
+          if (post.comments && post.comments.length > 0) {
+            log(`  → ${post.comments.length}개의 댓글 복원 중...`, 'info');
+            
+            for (const comment of post.comments) {
+              try {
+                await fetch(`${API_URL}/api/comments`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                  },
+                  body: JSON.stringify({
+                    postUuid: data.post.uuid,
+                    content: comment.content,
+                    parentId: null
+                  })
+                });
+              } catch (commentError) {
+                log(`  ⚠️ 댓글 복원 실패: ${commentError.message}`, 'error');
+              }
+            }
+          }
+
+          successCount++;
+          log(`✓ "${post.title}" 복원 완료`, 'success');
+
+          // API 과부하 방지를 위한 딜레이
+          await new Promise(resolve => setTimeout(resolve, 100));
+
+        } catch (error) {
+          failCount++;
+          log(`✗ "${post.title}" 복원 실패: ${error.message}`, 'error');
+        }
+      }
+
+      log('', 'info');
+      log('='.repeat(50), 'info');
+      log(`복원 완료! 성공: ${successCount}개, 실패: ${failCount}개`, successCount > 0 ? 'success' : 'error');
+      
+      if (successCount > 0) {
+        log('', 'info');
+        log('💡 페이지를 새로고침하면 복원된 게시글을 볼 수 있습니다.', 'info');
+        
+        if (confirm('복원이 완료되었습니다. 페이지를 새로고침하시겠습니까?')) {
+          window.location.href = '/';
+        }
+      }
+    }
+  </script>
+</body>
+</html>

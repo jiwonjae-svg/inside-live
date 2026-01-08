@@ -1,0 +1,10 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "installCommand": "npm install",
+  "env": {
+    "VITE_API_URL": "https://inside-live-backend.vercel.app/api",
+    "VITE_SOCKET_URL": "https://inside-live-backend.vercel.app"
+  }
+}
