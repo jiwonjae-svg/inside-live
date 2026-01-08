@@ -179,9 +179,14 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`🚀 서버가 포트 ${PORT}에서 실행 중입니다.`);
-});
 
-module.exports = { app, io };
+// Vercel 환경이 아닐 때만 서버 시작
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  server.listen(PORT, () => {
+    console.log(`🚀 서버가 포트 ${PORT}에서 실행 중입니다.`);
+  });
+}
+
+// Vercel을 위한 export
+module.exports = app;
  
