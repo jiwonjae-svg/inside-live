@@ -7,9 +7,10 @@ export const getApiBaseUrl = () => {
   // 끝에 슬래시가 있으면 제거
   url = url.endsWith('/') ? url.slice(0, -1) : url;
   
-  // 디버깅: 환경 변수 확인
-  console.log('🔧 API Base URL:', url);
-  console.log('🔧 Environment:', import.meta.env.MODE);
+  // 프로덕션이 아닐 때만 디버깅
+  if (import.meta.env.MODE !== 'production') {
+    console.log('🔧 API Base URL:', url);
+  }
   
   return url;
 };
@@ -20,8 +21,6 @@ export const buildApiUrl = (path) => {
   // path가 /로 시작하지 않으면 추가
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   const fullUrl = `${baseUrl}${normalizedPath}`;
-  
-  console.log('🔗 Building URL:', path, '→', fullUrl);
   
   return fullUrl;
 };

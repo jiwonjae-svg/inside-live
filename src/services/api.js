@@ -46,8 +46,6 @@ const apiRequest = async (url, options = {}) => {
     const normalizedUrl = url.startsWith('/') ? url : `/${url}`;
     const fullUrl = `${API_URL}${normalizedUrl}`;
     
-    console.log('🌐 API 요청:', fullUrl);
-    
     const response = await fetch(fullUrl, {
       ...options,
       headers: {
@@ -61,7 +59,7 @@ const apiRequest = async (url, options = {}) => {
     const contentType = response.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
       const text = await response.text();
-      console.error('❌ JSON이 아닌 응답:', text.substring(0, 500));
+      console.error('❌ JSON이 아닌 응답:', text.substring(0, 200));
       throw new Error(`서버가 JSON이 아닌 응답을 반환했습니다: ${response.status}`);
     }
 

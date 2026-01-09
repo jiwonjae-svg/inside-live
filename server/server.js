@@ -1,8 +1,16 @@
-// Vercel에서는 환경 변수가 자동으로 로드됨
-if (process.env.VERCEL !== '1') {
+// 환경 변수 로드 및 환경 감지
+const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
+const isProduction = process.env.NODE_ENV === 'production';
+
+if (!isVercel) {
   const dotenv = require('dotenv');
   dotenv.config();
+  console.log('📝 .env 파일 로드됨');
 }
+
+console.log('🔧 환경:', isVercel ? 'Vercel' : '로컬', isProduction ? '프로덕션' : '개발');
+console.log('🔧 MONGODB_URI:', process.env.MONGODB_URI ? '✅ 설정됨' : '❌ 없음');
+console.log('🔧 JWT_SECRET:', process.env.JWT_SECRET ? '✅ 설정됨' : '❌ 없음');
 
 const express = require('express');
 const mongoose = require('mongoose');
@@ -75,13 +83,19 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(sanitizeInput);
 
 // 세션 설정
+const sessionSecret = process.env.SESSION_SECRET || process.env.JWT_SECRET || 'dev-secret-key-change-in-production';
+if (!process.env.SESSION_SECRET && !process.env.JWT_SECRET) {
+  console.warn('⚠️ SESSION_SECRET와 JWT_SECRET이 설정되지 않음. 기본값 사용 중.');
+}
+
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-secret-key',
+  secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 24 * 60 * 60 * 1000 // 24시간
+    secure: isProduction,
+    maxAge: 24 * 60 * 60 * 1000, // 24시간
+    sameSite: isProduction ? 'none' : 'lax'
   }
 }));
 
@@ -92,15 +106,19 @@ if (process.env.GOOGLE_CLIENT_ID || process.env.GITHUB_CLIENT_ID) {
   app.use(passport.session());
 }
 
-// Rate Limiting
+// Rate Limiting (API 경로에 맞게 수정)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15분
-  max: 100 // 최대 100 요청
+  max: isProduction ? 100 : 1000, // 프로덕션: 100, 개발: 1000
+  message: '너무 많은 요청이 발생했습니다. 잠시 후 다시 시도해주세요.'
 });
-app.use('/api/', limiter);
+// Vercel에서는 /api prefix가 없으므로 / 경로에 적용
+app.use(limiter);
 
 // MongoDB 연결 - Vercel에서는 각 요청마다 연결 재사용
 let cachedDb = null;
+let connectionAttempts = 0;
+const MAX_RETRY_ATTEMPTS = 3;
 
 async function connectDB() {
   if (cachedDb && mongoose.connection.readyState === 1) {
@@ -108,19 +126,38 @@ async function connectDB() {
   }
   
   if (!process.env.MONGODB_URI) {
-    console.warn('⚠️ MONGODB_URI 환경 변수가 설정되지 않았습니다');
+    console.error('❌ MONGODB_URI 환경 변수가 설정되지 않았습니다');
+    if (isProduction) {
+      throw new Error('MONGODB_URI is required in production');
+    }
     return null;
   }
   
   try {
+    connectionAttempts++;
+    console.log(`🔄 MongoDB 연결 시도 (${connectionAttempts}/${MAX_RETRY_ATTEMPTS})...`);
+    
     const db = await mongoose.connect(process.env.MONGODB_URI, {
       serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
     });
+    
     cachedDb = db;
+    connectionAttempts = 0; // 성공 시 리셋
     console.log('✅ MongoDB 연결 성공');
     return db;
   } catch (err) {
-    console.error('❌ MongoDB 연결 실패:', err.message);
+    console.error(`❌ MongoDB 연결 실패 (시도 ${connectionAttempts}):`, err.message);
+    
+    if (connectionAttempts < MAX_RETRY_ATTEMPTS && !isProduction) {
+      console.log('🔄 재연결 시도 중...');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      return connectDB();
+    }
+    
+    if (isProduction) {
+      throw err;
+    }
     return null;
   }
 }
@@ -161,65 +198,109 @@ try {
   const adminRoutes = require('./routes/admin');
   const messageRoutes = require('./routes/messages');
 
-  // Vercel에서는 이미 /api로 라우팅되므로 prefix 제거
-  app.use('/auth', authRoutes);
-  app.use('/posts', postRoutes);
-  app.use('/comments', commentRoutes);
-  app.use('/users', userRoutes);
-  app.use('/upload', uploadRoutes);
-  app.use('/email', emailRoutes);
-  app.use('/messages', messageRoutes);
-  app.use('/admin', adminRoutes);
+  // 환경에 따라 API prefix 조정
+  // Vercel: /api prefix 없음 (vercel.json에서 /api로 라우팅)
+  // 로컬: /api prefix 사용
+  const apiPrefix = isVercel ? '' : '/api';
   
-  console.log('✅ 모든 라우터 등록 완료');
+  app.use(`${apiPrefix}/auth`, authRoutes);
+  app.use(`${apiPrefix}/posts`, postRoutes);
+  app.use(`${apiPrefix}/comments`, commentRoutes);
+  app.use(`${apiPrefix}/users`, userRoutes);
+  app.use(`${apiPrefix}/upload`, uploadRoutes);
+  app.use(`${apiPrefix}/email`, emailRoutes);
+  app.use(`${apiPrefix}/messages`, messageRoutes);
+  app.use(`${apiPrefix}/admin`, adminRoutes);
+  
+  console.log(`✅ 모든 라우터 등록 완료 (prefix: "${apiPrefix || '/'}")`);
 } catch (error) {
   console.error('❌ 라우트 로딩 실패:', error.message);
+  console.error(error.stack);
 }
 
 // OAuth 라우트 (환경 변수가 설정된 경우에만)
 if (process.env.GOOGLE_CLIENT_ID || process.env.GITHUB_CLIENT_ID) {
-  const jwt = require('jsonwebtoken');
-  const passport = require('./config/passport');
+  try {
+    const jwt = require('jsonwebtoken');
+    const passport = require('./config/passport');
+    
+    if (!process.env.JWT_SECRET) {
+      console.warn('⚠️ JWT_SECRET이 설정되지 않음. OAuth 토큰 생성 불가능.');
+    }
 
-  // Google OAuth
-  if (process.env.GOOGLE_CLIENT_ID) {
-    app.get('/auth/google',
-      passport.authenticate('google', { scope: ['profile', 'email'] })
-    );
+    const apiPrefix = isVercel ? '' : '/api';
 
-    app.get('/auth/google/callback',
-      passport.authenticate('google', { session: false, failureRedirect: `${process.env.CLIENT_URL}/login` }),
-      (req, res) => {
-        const token = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
-        const refreshToken = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
-        res.redirect(`${process.env.CLIENT_URL}/auth/callback?token=${token}&refreshToken=${refreshToken}`);
-      }
-    );
+    // Google OAuth
+    if (process.env.GOOGLE_CLIENT_ID) {
+      app.get(`${apiPrefix}/auth/google`,
+        passport.authenticate('google', { scope: ['profile', 'email'] })
+      );
+
+      app.get(`${apiPrefix}/auth/google/callback`,
+        passport.authenticate('google', { session: false, failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:5173'}/login` }),
+        (req, res) => {
+          if (!process.env.JWT_SECRET) {
+            return res.status(500).json({ error: 'JWT_SECRET not configured' });
+          }
+          const token = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
+          const refreshToken = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+          res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}/auth/callback?token=${token}&refreshToken=${refreshToken}`);
+        }
+      );
+      console.log('✅ Google OAuth 라우트 등록됨');
+    }
+
+    // GitHub OAuth
+    if (process.env.GITHUB_CLIENT_ID) {
+      app.get(`${apiPrefix}/auth/github`,
+        passport.authenticate('github', { scope: ['user:email'] })
+      );
+
+      app.get(`${apiPrefix}/auth/github/callback`,
+        passport.authenticate('github', { session: false, failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:5173'}/login` }),
+        (req, res) => {
+          if (!process.env.JWT_SECRET) {
+            return res.status(500).json({ error: 'JWT_SECRET not configured' });
+          }
+          const token = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
+          const refreshToken = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+          res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}/auth/callback?token=${token}&refreshToken=${refreshToken}`);
+        }
+      );
+      console.log('✅ GitHub OAuth 라우트 등록됨');
+    }
+  } catch (error) {
+    console.error('❌ OAuth 라우트 설정 실패:', error.message);
   }
-
-  // GitHub OAuth
-  if (process.env.GITHUB_CLIENT_ID) {
-    app.get('/auth/github',
-      passport.authenticate('github', { scope: ['user:email'] })
-    );
-
-    app.get('/auth/github/callback',
-      passport.authenticate('github', { session: false, failureRedirect: `${process.env.CLIENT_URL}/login` }),
-      (req, res) => {
-        const token = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
-        const refreshToken = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
-        res.redirect(`${process.env.CLIENT_URL}/auth/callback?token=${token}&refreshToken=${refreshToken}`);
-      }
-    );
-  }
+} else {
+  console.log('ℹ️ OAuth 환경 변수 미설정 - OAuth 비활성화됨');
 }
+
+// 404 핸들러 (모든 라우트 이후)
+app.use((req, res, next) => {
+  console.log(`⚠️ 404 Not Found: ${req.method} ${req.path}`);
+  res.status(404).json({ 
+    error: 'Not Found',
+    message: `경로를 찾을 수 없습니다: ${req.path}`,
+    method: req.method,
+    path: req.path
+  });
+});
 
 // 에러 핸들링
 app.use((err, req, res, next) => {
-  console.error('❌ 서버 에러:', err.stack);
-  res.status(500).json({ 
-    error: '서버 오류가 발생했습니다.',
-    message: process.env.NODE_ENV === 'development' ? err.message : undefined
+  console.error('❌ 서버 에러:', {
+    message: err.message,
+    stack: isProduction ? undefined : err.stack,
+    path: req.path,
+    method: req.method
+  });
+  
+  res.status(err.status || 500).json({ 
+    error: isProduction ? '서버 오류가 발생했습니다.' : err.message,
+    message: err.message,
+    stack: isProduction ? undefined : err.stack,
+    path: req.path
   });
 });
 
