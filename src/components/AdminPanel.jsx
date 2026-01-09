@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/AdminPanel.css';
+import { buildApiUrl } from '../utils/apiUrl';
 
 function AdminPanel({ onClose, currentUser }) {
   const [activeTab, setActiveTab] = useState('users');
@@ -30,7 +31,7 @@ function AdminPanel({ onClose, currentUser }) {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch(`${API_URL}/admin/users`, {
+      const response = await fetch(buildApiUrl('/admin/users'), {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -53,7 +54,7 @@ function AdminPanel({ onClose, currentUser }) {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch(`${API_URL}/admin/posts`, {
+      const response = await fetch(buildApiUrl('/admin/posts'), {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -76,7 +77,7 @@ function AdminPanel({ onClose, currentUser }) {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch(`${API_URL}/admin/deleted-posts`, {
+      const response = await fetch(buildApiUrl('/admin/deleted-posts'), {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -101,7 +102,7 @@ function AdminPanel({ onClose, currentUser }) {
     }
 
     try {
-      const response = await fetch(`${API_URL}/admin/posts/${postId}`, {
+      const response = await fetch(buildApiUrl(`/admin/posts/${postId}`), {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -126,7 +127,7 @@ function AdminPanel({ onClose, currentUser }) {
     }
 
     try {
-      const response = await fetch(`${API_URL}/admin/posts/${postId}/restore`, {
+      const response = await fetch(buildApiUrl(`/admin/posts/${postId}/restore`), {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -151,7 +152,7 @@ function AdminPanel({ onClose, currentUser }) {
     }
 
     try {
-      const response = await fetch(`${API_URL}/admin/posts/${postId}/permanent`, {
+      const response = await fetch(buildApiUrl(`/admin/posts/${postId}/permanent`), {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -186,8 +187,8 @@ function AdminPanel({ onClose, currentUser }) {
 
     try {
       const endpoint = selectedUser.isBanned 
-        ? `${API_URL}/admin/users/${selectedUser._id}/unban`
-        : `${API_URL}/admin/users/${selectedUser._id}/ban`;
+        ? buildApiUrl(`/admin/users/${selectedUser._id}/unban`)
+        : buildApiUrl(`/admin/users/${selectedUser._id}/ban`);
       
       const response = await fetch(endpoint, {
         method: 'PUT',

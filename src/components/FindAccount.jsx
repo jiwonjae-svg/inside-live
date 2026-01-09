@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import DynamicBackground from './DynamicBackground';
 import './FindAccount.css';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { buildApiUrl } from '../utils/apiUrl';
 
 function FindAccount({ onFindAccount, onResetPassword, onSwitchToLogin, onGoToMain }) {
   const [mode, setMode] = useState('find'); // 'find' or 'reset'
@@ -33,8 +32,8 @@ function FindAccount({ onFindAccount, onResetPassword, onSwitchToLogin, onGoToMa
     try {
       // 비밀번호 재설정 모드일 때는 다른 엔드포인트 사용
       const endpoint = mode === 'reset' 
-        ? `${API_URL}/email/send-reset-code`
-        : `${API_URL}/email/send-verification`;
+        ? buildApiUrl('/email/send-reset-code')
+        : buildApiUrl('/email/send-verification');
       
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -64,7 +63,7 @@ function FindAccount({ onFindAccount, onResetPassword, onSwitchToLogin, onGoToMa
     }
 
     try {
-      const response = await fetch(`${API_URL}/email/verify-code`, {
+      const response = await fetch(buildApiUrl('/email/verify-code'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, code: verificationCode })

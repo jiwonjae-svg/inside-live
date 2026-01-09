@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import DynamicBackground from './DynamicBackground';
 import './Register.css';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { buildApiUrl } from '../utils/apiUrl';
 
 function Register({ onRegister, onSwitchToLogin, onGoToMain }) {
   const [formData, setFormData] = useState({
@@ -90,7 +89,7 @@ function Register({ onRegister, onSwitchToLogin, onGoToMain }) {
     setError('');
 
     try {
-      const response = await fetch(`${API_URL}/email/send-verification`, {
+      const response = await fetch(buildApiUrl('/email/send-verification'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: formData.email })
@@ -119,7 +118,7 @@ function Register({ onRegister, onSwitchToLogin, onGoToMain }) {
     }
 
     try {
-      const response = await fetch(`${API_URL}/email/verify-code`, {
+      const response = await fetch(buildApiUrl('/email/verify-code'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
