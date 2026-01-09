@@ -114,25 +114,46 @@ app.use((req, res, next) => {
   next();
 });
 
-// 라우트
-const authRoutes = require('./routes/auth');
-const postRoutes = require('./routes/posts');
-const commentRoutes = require('./routes/comments');
-const userRoutes = require('./routes/users');
-const uploadRoutes = require('./routes/upload');
-const emailRoutes = require('./routes/email');
-const adminRoutes = require('./routes/admin');
-const messageRoutes = require('./routes/messages');
+// 테스트 라우트 (가장 먼저)
+app.get('/', (req, res) => {
+  res.json({ 
+    message: '🚀 Community Board API Server',
+    status: 'running',
+    timestamp: new Date().toISOString()
+  });
+});
 
-app.use('/api/auth', authRoutes);
-console.log('📍 /api/auth 라우터 등록 완료');
-app.use('/api/posts', postRoutes);
-app.use('/api/comments', commentRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/upload', uploadRoutes);
-app.use('/api/email', emailRoutes);
-app.use('/api/messages', messageRoutes);
-app.use('/api/admin', adminRoutes);
+app.get('/api', (req, res) => {
+  res.json({ 
+    message: '🚀 Community Board API',
+    status: 'running'
+  });
+});
+
+// 라우트 안전하게 로드
+try {
+  const authRoutes = require('./routes/auth');
+  const postRoutes = require('./routes/posts');
+  const commentRoutes = require('./routes/comments');
+  const userRoutes = require('./routes/users');
+  const uploadRoutes = require('./routes/upload');
+  const emailRoutes = require('./routes/email');
+  const adminRoutes = require('./routes/admin');
+  const messageRoutes = require('./routes/messages');
+
+  app.use('/api/auth', authRoutes);
+  app.use('/api/posts', postRoutes);
+  app.use('/api/comments', commentRoutes);
+  app.use('/api/users', userRoutes);
+  app.use('/api/upload', uploadRoutes);
+  app.use('/api/email', emailRoutes);
+  app.use('/api/messages', messageRoutes);
+  app.use('/api/admin', adminRoutes);
+  
+  console.log('✅ 모든 라우터 등록 완료');
+} catch (error) {
+  console.error('❌ 라우트 로딩 실패:', error.message);
+}
 
 // OAuth 라우트 (환경 변수가 설정된 경우에만)
 if (process.env.GOOGLE_CLIENT_ID || process.env.GITHUB_CLIENT_ID) {
@@ -172,15 +193,13 @@ if (process.env.GOOGLE_CLIENT_ID || process.env.GITHUB_CLIENT_ID) {
   }
 }
 
-// 테스트 라우트
-app.get('/', (req, res) => {
-  res.json({ message: '🚀 Community Board API Server' });
-});
-
 // 에러 핸들링
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: '서버 오류가 발생했습니다.' });
+  console.error('❌ 서버 에러:', err.stack);
+  res.status(500).json({ 
+    error: '서버 오류가 발생했습니다.',
+    message: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
 });
 
 // Vercel을 위한 export
