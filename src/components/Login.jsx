@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import DynamicBackground from './DynamicBackground';
 import './Login.css';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { buildApiUrl } from '../utils/apiUrl';
 
 function Login({ onLogin, onSwitchToRegister, onSwitchToFindAccount, onGoToMain }) {
   const [formData, setFormData] = useState({

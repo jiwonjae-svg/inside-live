@@ -3,8 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import Login from './components/Login';
 import Register from './components/Register';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { buildApiUrl } from './utils/apiUrl';
 import FindAccount from './components/FindAccount';
 import PostList from './components/PostList';
 import PostDetail from './components/PostDetail';
@@ -147,7 +146,7 @@ function MainApp() {
     const fetchPosts = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`${API_URL}/posts?limit=1000`);
+        const response = await fetch(buildApiUrl('/posts?limit=1000'));
         const data = await response.json();
         
         if (data.posts) {
@@ -446,7 +445,7 @@ function MainApp() {
     
     try {
       // 서버에 게시글 저장
-      const response = await fetch(`${API_URL}/posts`, {
+      const response = await fetch(buildApiUrl('/posts'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -469,7 +468,7 @@ function MainApp() {
       
       // 게시글 목록 다시 불러오기
       try {
-        const postsResponse = await fetch(`${API_URL}/posts?limit=1000`);
+        const postsResponse = await fetch(buildApiUrl('/posts?limit=1000'));
         if (postsResponse.ok) {
           const postsData = await postsResponse.json();
           const formattedPosts = postsData.posts.map(post => ({
@@ -531,7 +530,7 @@ function MainApp() {
     if (!editingPost) return;
     
     try {
-      const response = await fetch(`${API_URL}/posts/${editingPost.uuid}`, {
+      const response = await fetch(buildApiUrl(`/posts/${editingPost.uuid}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -578,7 +577,7 @@ function MainApp() {
     if (!post) return;
     
     try {
-      const response = await fetch(`${API_URL}/posts/${post.uuid}`, {
+      const response = await fetch(buildApiUrl(`/posts/${post.uuid}`), {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -610,7 +609,7 @@ function MainApp() {
     if (!post) return;
 
     try {
-      const response = await fetch(`${API_URL}/posts/${post.uuid}/like`, {
+      const response = await fetch(buildApiUrl(`/posts/${post.uuid}/like`), {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -673,7 +672,7 @@ function MainApp() {
     if (!post) return;
 
     try {
-      const response = await fetch(`${API_URL}/comments`, {
+      const response = await fetch(buildApiUrl('/comments'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -785,7 +784,7 @@ function MainApp() {
     if (!post) return;
 
     try {
-      const response = await fetch(`${API_URL}/comments/${commentId}`, {
+      const response = await fetch(buildApiUrl(`/comments/${commentId}`), {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -889,7 +888,7 @@ function MainApp() {
     if (!post) return;
     
     try {
-      const response = await fetch(`${API_URL}/posts/${post.uuid}/scrap`, {
+      const response = await fetch(buildApiUrl(`/posts/${post.uuid}/scrap`), {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`

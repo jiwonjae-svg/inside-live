@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import './PostDetail.css';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { buildApiUrl } from '../utils/apiUrl';
 
 function PostDetail({ post, currentUser, onEdit, onBack, onDelete, onToggleLike, onAddComment, onDeleteComment, allPosts, onSelectPost, onCreateNew }) {
   const [commentText, setCommentText] = useState('');
@@ -24,7 +23,7 @@ function PostDetail({ post, currentUser, onEdit, onBack, onDelete, onToggleLike,
     const checkScrapStatus = async () => {
       if (currentUser && post.uuid) {
         try {
-          const response = await fetch(`${API_URL}/auth/me`, {
+          const response = await fetch(buildApiUrl('/auth/me'), {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
@@ -51,7 +50,7 @@ function PostDetail({ post, currentUser, onEdit, onBack, onDelete, onToggleLike,
     }
 
     try {
-      const response = await fetch(`${API_URL}/posts/${post.uuid}/scrap`, {
+      const response = await fetch(buildApiUrl(`/posts/${post.uuid}/scrap`), {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
