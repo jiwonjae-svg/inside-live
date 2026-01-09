@@ -20,8 +20,11 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
   'https://inside-live.vercel.app',
-  'https://inside-live-frontend.vercel.app'
+  'https://inside-live-frontend.vercel.app',
+  /^https:\/\/inside-live.*\.vercel\.app$/ // 모든 Vercel 프리뷰 배포 허용
 ].filter(Boolean);
+
+console.log('🌐 허용된 CORS Origins:', allowedOrigins);
 
 // Socket.IO는 Vercel serverless에서 지원되지 않음
 // 실시간 기능은 프론트엔드에서 폴링으로 대체 필요
@@ -32,17 +35,34 @@ app.use(helmet({
 }));
 app.use(cors({
   origin: function (origin, callback) {
-    // origin이 없는 경우(같은 도메인) 또는 허용 목록에 있는 경우
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+    // origin이 없는 경우(같은 도메인, Postman 등) 허용
+    if (!origin) {
+      return callback(null, true);
+    }
+    
+    // 허용 목록 확인 (문자열 또는 정규표현식)
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      if (typeof allowedOrigin === 'string') {
+        return allowedOrigin === origin;
+      }
+      if (allowedOrigin instanceof RegExp) {
+        return allowedOrigin.test(origin);
+      }
+      return false;
+    });
+    
+    if (isAllowed) {
       callback(null, true);
     } else {
       console.log('❌ CORS blocked origin:', origin);
-      callback(null, true); // 개발 중에는 모든 origin 허용
+      // 개발 중에는 모든 origin 허용
+      callback(null, true);
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Authorization']
 }));
 
 // Preflight 요청 처리

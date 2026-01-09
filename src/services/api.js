@@ -1,4 +1,4 @@
-// API 기본 URL
+// API 기본 URL (끝에 슬래시 없이)
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 // 토큰 관리
@@ -42,12 +42,17 @@ const getHeaders = (includeAuth = true) => {
 // API 요청 헬퍼
 const apiRequest = async (url, options = {}) => {
   try {
-    const response = await fetch(`${API_URL}${url}`, {
+    // URL 정규화: 이중 슬래시 방지
+    const normalizedUrl = url.startsWith('/') ? url : `/${url}`;
+    const fullUrl = `${API_URL}${normalizedUrl}`;
+    
+    const response = await fetch(fullUrl, {
       ...options,
       headers: {
         ...getHeaders(options.auth !== false),
         ...options.headers
-      }
+      },
+      credentials: 'include' // CORS 쿠키 포함
     });
 
     const data = await response.json();
