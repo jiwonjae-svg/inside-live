@@ -13,14 +13,11 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const http = require('http');
-const socketIO = require('socket.io');
 const session = require('express-session');
 const passport = require('./config/passport'); // dotenv.config() 이후에 로드
 const sanitizeInput = require('./middleware/sanitize');
 
 const app = express();
-const server = http.createServer(app);
 
 // CORS 허용 origin 목록
 const allowedOrigins = [
@@ -31,13 +28,8 @@ const allowedOrigins = [
   'https://inside-live-frontend.vercel.app'
 ].filter(Boolean);
 
-const io = socketIO(server, {
-  cors: {
-    origin: allowedOrigins,
-    methods: ['GET', 'POST'],
-    credentials: true
-  }
-});
+// Socket.IO는 Vercel serverless에서 지원되지 않음
+// 실시간 기능은 프론트엔드에서 폴링으로 대체 필요
 
 // 미들웨어
 app.use(helmet({
@@ -89,39 +81,31 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// MongoDB 연결
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/community-board', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-.then(() => console.log('✅ MongoDB 연결 성공'))
-.catch(err => console.error('❌ MongoDB 연결 실패:', err));
+// MongoDB 연결 - Vercel에서는 각 요청마다 연결 재사용
+let cachedDb = null;
 
-// Socket.IO 설정
-io.on('connection', (socket) => {
-  console.log('✅ 새로운 클라이언트 연결:', socket.id);
+async function connectDB() {
+  if (cachedDb && mongoose.connection.readyState === 1) {
+    return cachedDb;
+  }
+  
+  try {
+    const db = await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/community-board', {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000,
+    });
+    cachedDb = db;
+    console.log('✅ MongoDB 연결 성공');
+    return db;
+  } catch (err) {
+    console.error('❌ MongoDB 연결 실패:', err);
+    throw err;
+  }
+}
 
-  socket.on('join-board', (boardId) => {
-    socket.join(boardId);
-    console.log(`사용자 ${socket.id}가 ${boardId} 게시판에 입장`);
-  });
-
-  socket.on('leave-board', (boardId) => {
-    socket.leave(boardId);
-  });
-
-  socket.on('new-post', (data) => {
-    io.to(data.category).emit('post-created', data);
-  });
-
-  socket.on('new-comment', (data) => {
-    io.to(`post-${data.postId}`).emit('comment-added', data);
-  });
-
-  socket.on('disconnect', () => {
-    console.log('❌ 클라이언트 연결 해제:', socket.id);
-  });
-});
+// 초기 연결
+connectDB().catch(console.error);
 
 // 요청 로깅 미들웨어
 app.use((req, res, next) => {
@@ -197,15 +181,14 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: '서버 오류가 발생했습니다.' });
 });
 
-const PORT = process.env.PORT || 5000;
+// Vercel을 위한 export
+module.exports = app;
 
-// Vercel 환경이 아닐 때만 서버 시작
-if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
-  server.listen(PORT, () => {
+// 로컬 개발 환경에서만 서버 시작
+if (require.main === module) {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
     console.log(`🚀 서버가 포트 ${PORT}에서 실행 중입니다.`);
   });
 }
-
-// Vercel을 위한 export
-module.exports = app;
  
