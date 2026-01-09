@@ -161,14 +161,15 @@ try {
   const adminRoutes = require('./routes/admin');
   const messageRoutes = require('./routes/messages');
 
-  app.use('/api/auth', authRoutes);
-  app.use('/api/posts', postRoutes);
-  app.use('/api/comments', commentRoutes);
-  app.use('/api/users', userRoutes);
-  app.use('/api/upload', uploadRoutes);
-  app.use('/api/email', emailRoutes);
-  app.use('/api/messages', messageRoutes);
-  app.use('/api/admin', adminRoutes);
+  // Vercel에서는 이미 /api로 라우팅되므로 prefix 제거
+  app.use('/auth', authRoutes);
+  app.use('/posts', postRoutes);
+  app.use('/comments', commentRoutes);
+  app.use('/users', userRoutes);
+  app.use('/upload', uploadRoutes);
+  app.use('/email', emailRoutes);
+  app.use('/messages', messageRoutes);
+  app.use('/admin', adminRoutes);
   
   console.log('✅ 모든 라우터 등록 완료');
 } catch (error) {
@@ -182,11 +183,11 @@ if (process.env.GOOGLE_CLIENT_ID || process.env.GITHUB_CLIENT_ID) {
 
   // Google OAuth
   if (process.env.GOOGLE_CLIENT_ID) {
-    app.get('/api/auth/google',
+    app.get('/auth/google',
       passport.authenticate('google', { scope: ['profile', 'email'] })
     );
 
-    app.get('/api/auth/google/callback',
+    app.get('/auth/google/callback',
       passport.authenticate('google', { session: false, failureRedirect: `${process.env.CLIENT_URL}/login` }),
       (req, res) => {
         const token = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
@@ -198,11 +199,11 @@ if (process.env.GOOGLE_CLIENT_ID || process.env.GITHUB_CLIENT_ID) {
 
   // GitHub OAuth
   if (process.env.GITHUB_CLIENT_ID) {
-    app.get('/api/auth/github',
+    app.get('/auth/github',
       passport.authenticate('github', { scope: ['user:email'] })
     );
 
-    app.get('/api/auth/github/callback',
+    app.get('/auth/github/callback',
       passport.authenticate('github', { session: false, failureRedirect: `${process.env.CLIENT_URL}/login` }),
       (req, res) => {
         const token = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
