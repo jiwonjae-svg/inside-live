@@ -1,12 +1,8 @@
-const dotenv = require('dotenv');
-dotenv.config(); // 가장 먼저 환경 변수 로드
-
-// 환경 변수 로드 확인 (디버깅용)
-console.log('🔍 환경 변수 확인:');
-console.log('GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? '✅ 설정됨' : '❌ 없음');
-console.log('GOOGLE_CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET ? '✅ 설정됨' : '❌ 없음');
-console.log('GITHUB_CLIENT_ID:', process.env.GITHUB_CLIENT_ID ? '✅ 설정됨' : '❌ 없음');
-console.log('GITHUB_CLIENT_SECRET:', process.env.GITHUB_CLIENT_SECRET ? '✅ 설정됨' : '❌ 없음');
+// Vercel에서는 환경 변수가 자동으로 로드됨
+if (process.env.VERCEL !== '1') {
+  const dotenv = require('dotenv');
+  dotenv.config();
+}
 
 const express = require('express');
 const mongoose = require('mongoose');
@@ -14,7 +10,6 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const session = require('express-session');
-const passport = require('./config/passport'); // dotenv.config() 이후에 로드
 const sanitizeInput = require('./middleware/sanitize');
 
 const app = express();
@@ -70,9 +65,12 @@ app.use(session({
   }
 }));
 
-// Passport 초기화
-app.use(passport.initialize());
-app.use(passport.session());
+// Passport 초기화 (OAuth 사용 시에만)
+if (process.env.GOOGLE_CLIENT_ID || process.env.GITHUB_CLIENT_ID) {
+  const passport = require('./config/passport');
+  app.use(passport.initialize());
+  app.use(passport.session());
+}
 
 // Rate Limiting
 const limiter = rateLimit({
@@ -89,23 +87,26 @@ async function connectDB() {
     return cachedDb;
   }
   
+  if (!process.env.MONGODB_URI) {
+    console.warn('⚠️ MONGODB_URI 환경 변수가 설정되지 않았습니다');
+    return null;
+  }
+  
   try {
-    const db = await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/community-board', {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
+    const db = await mongoose.connect(process.env.MONGODB_URI, {
       serverSelectionTimeoutMS: 5000,
     });
     cachedDb = db;
     console.log('✅ MongoDB 연결 성공');
     return db;
   } catch (err) {
-    console.error('❌ MongoDB 연결 실패:', err);
-    throw err;
+    console.error('❌ MongoDB 연결 실패:', err.message);
+    return null;
   }
 }
 
-// 초기 연결
-connectDB().catch(console.error);
+// 초기 연결 시도 (에러 무시)
+connectDB().catch(err => console.warn('초기 DB 연결 실패:', err.message));
 
 // 요청 로깅 미들웨어
 app.use((req, res, next) => {
@@ -133,42 +134,43 @@ app.use('/api/email', emailRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/admin', adminRoutes);
 
-// OAuth 라우트
-const jwt = require('jsonwebtoken');
+// OAuth 라우트 (환경 변수가 설정된 경우에만)
+if (process.env.GOOGLE_CLIENT_ID || process.env.GITHUB_CLIENT_ID) {
+  const jwt = require('jsonwebtoken');
+  const passport = require('./config/passport');
 
-// Google OAuth
-app.get('/api/auth/google',
-  passport.authenticate('google', { scope: ['profile', 'email'] })
-);
+  // Google OAuth
+  if (process.env.GOOGLE_CLIENT_ID) {
+    app.get('/api/auth/google',
+      passport.authenticate('google', { scope: ['profile', 'email'] })
+    );
 
-app.get('/api/auth/google/callback',
-  passport.authenticate('google', { session: false, failureRedirect: `${process.env.CLIENT_URL}/login` }),
-  (req, res) => {
-    // JWT 토큰 생성
-    const token = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
-    const refreshToken = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
-    
-    // 프론트엔드로 리다이렉트 (토큰 포함)
-    res.redirect(`${process.env.CLIENT_URL}/auth/callback?token=${token}&refreshToken=${refreshToken}`);
+    app.get('/api/auth/google/callback',
+      passport.authenticate('google', { session: false, failureRedirect: `${process.env.CLIENT_URL}/login` }),
+      (req, res) => {
+        const token = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
+        const refreshToken = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+        res.redirect(`${process.env.CLIENT_URL}/auth/callback?token=${token}&refreshToken=${refreshToken}`);
+      }
+    );
   }
-);
 
-// GitHub OAuth
-app.get('/api/auth/github',
-  passport.authenticate('github', { scope: ['user:email'] })
-);
+  // GitHub OAuth
+  if (process.env.GITHUB_CLIENT_ID) {
+    app.get('/api/auth/github',
+      passport.authenticate('github', { scope: ['user:email'] })
+    );
 
-app.get('/api/auth/github/callback',
-  passport.authenticate('github', { session: false, failureRedirect: `${process.env.CLIENT_URL}/login` }),
-  (req, res) => {
-    // JWT 토큰 생성
-    const token = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
-    const refreshToken = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
-    
-    // 프론트엔드로 리다이렉트 (토큰 포함)
-    res.redirect(`${process.env.CLIENT_URL}/auth/callback?token=${token}&refreshToken=${refreshToken}`);
+    app.get('/api/auth/github/callback',
+      passport.authenticate('github', { session: false, failureRedirect: `${process.env.CLIENT_URL}/login` }),
+      (req, res) => {
+        const token = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
+        const refreshToken = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+        res.redirect(`${process.env.CLIENT_URL}/auth/callback?token=${token}&refreshToken=${refreshToken}`);
+      }
+    );
   }
-);
+}
 
 // 테스트 라우트
 app.get('/', (req, res) => {
