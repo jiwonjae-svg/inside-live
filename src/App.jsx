@@ -147,6 +147,20 @@ function MainApp() {
       try {
         setLoading(true);
         const response = await fetch(buildApiUrl('/posts?limit=1000'));
+        
+        // 응답 상태 확인
+        if (!response.ok) {
+          throw new Error(`서버 응답 오류: ${response.status} ${response.statusText}`);
+        }
+        
+        // Content-Type 확인
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          const text = await response.text();
+          console.error('JSON이 아닌 응답:', text.substring(0, 200));
+          throw new Error('서버가 올바른 JSON 응답을 반환하지 않았습니다.');
+        }
+        
         const data = await response.json();
         
         if (data.posts) {

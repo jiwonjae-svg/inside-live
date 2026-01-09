@@ -46,6 +46,8 @@ const apiRequest = async (url, options = {}) => {
     const normalizedUrl = url.startsWith('/') ? url : `/${url}`;
     const fullUrl = `${API_URL}${normalizedUrl}`;
     
+    console.log('🌐 API 요청:', fullUrl);
+    
     const response = await fetch(fullUrl, {
       ...options,
       headers: {
@@ -54,6 +56,14 @@ const apiRequest = async (url, options = {}) => {
       },
       credentials: 'include' // CORS 쿠키 포함
     });
+
+    // 응답이 JSON인지 확인
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error('❌ JSON이 아닌 응답:', text.substring(0, 500));
+      throw new Error(`서버가 JSON이 아닌 응답을 반환했습니다: ${response.status}`);
+    }
 
     const data = await response.json();
 
@@ -72,7 +82,7 @@ const apiRequest = async (url, options = {}) => {
 
     return data;
   } catch (error) {
-    console.error('API Request Error:', error);
+    console.error('❌ API Request Error:', error);
     throw error;
   }
 };
