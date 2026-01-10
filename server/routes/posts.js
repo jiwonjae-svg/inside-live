@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { v4: uuidv4 } = require('uuid');
+const { generateUUID } = require('../utils/uuid');
 const Post = require('../models/Post');
 const User = require('../models/User');
 const { verifyToken, optionalAuth } = require('../middleware/auth');
@@ -168,7 +168,7 @@ router.post('/', verifyToken, async (req, res) => {
 
     // 게시글 생성
     const post = new Post({
-      uuid: uuidv4(),
+      uuid: generateUUID(),
       title,
       content,
       category,
