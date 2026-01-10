@@ -201,51 +201,62 @@ if (missingEnvVars.length > 0 && isProduction) {
 
 // 라우트 안전하게 로드
 let routesLoaded = false;
-try {
-  const authRoutes = require('./routes/auth');
-  const postRoutes = require('./routes/posts');
-  const commentRoutes = require('./routes/comments');
-  const userRoutes = require('./routes/users');
-  const uploadRoutes = require('./routes/upload');
-  const emailRoutes = require('./routes/email');
-  const adminRoutes = require('./routes/admin');
-  const messageRoutes = require('./routes/messages');
+let routeLoadError = null;
 
-  // 환경에 따라 API prefix 조정
-  // Vercel: /api prefix 없음 (vercel.json에서 /api로 라우팅)
-  // 로컬: /api prefix 사용
-  const apiPrefix = isVercel ? '' : '/api';
-  
-  app.use(`${apiPrefix}/auth`, authRoutes);
-  app.use(`${apiPrefix}/posts`, postRoutes);
-  app.use(`${apiPrefix}/comments`, commentRoutes);
-  app.use(`${apiPrefix}/users`, userRoutes);
-  app.use(`${apiPrefix}/upload`, uploadRoutes);
-  app.use(`${apiPrefix}/email`, emailRoutes);
-  app.use(`${apiPrefix}/messages`, messageRoutes);
-  app.use(`${apiPrefix}/admin`, adminRoutes);
-  
-  routesLoaded = true;
-  console.log(`✅ 모든 라우터 등록 완료 (prefix: "${apiPrefix || '/'}")`);
-  console.log(`   - ${apiPrefix || '/'}/auth`);
-  console.log(`   - ${apiPrefix || '/'}/posts`);
-  console.log(`   - ${apiPrefix || '/'}/comments`);
-  console.log(`   - ${apiPrefix || '/'}/users`);
-  console.log(`   - ${apiPrefix || '/'}/upload`);
-  console.log(`   - ${apiPrefix || '/'}/email`);
-  console.log(`   - ${apiPrefix || '/'}/messages`);
-  console.log(`   - ${apiPrefix || '/'}/admin`);
-} catch (error) {
-  console.error('❌ 라우트 로딩 실패:', error.message);
-  console.error(error.stack);
-  
-  if (isProduction) {
-    console.error('⚠️ 가능한 원인:');
-    console.error('   1. MongoDB 연결 실패 → MONGODB_URI 환경 변수 확인');
-    console.error('   2. 모델 로딩 실패 → 의존성 패키지 확인');
-    console.error('   3. 미들웨어 초기화 실패 → JWT_SECRET 환경 변수 확인');
+async function loadRoutes() {
+  try {
+    // MongoDB 연결 시도 (라우트 로딩 전 필수)
+    await connectDB();
+    
+    const authRoutes = require('./routes/auth');
+    const postRoutes = require('./routes/posts');
+    const commentRoutes = require('./routes/comments');
+    const userRoutes = require('./routes/users');
+    const uploadRoutes = require('./routes/upload');
+    const emailRoutes = require('./routes/email');
+    const adminRoutes = require('./routes/admin');
+    const messageRoutes = require('./routes/messages');
+
+    // 환경에 따라 API prefix 조정
+    // Vercel: /api prefix 없음 (vercel.json에서 /api로 라우팅)
+    // 로컬: /api prefix 사용
+    const apiPrefix = isVercel ? '' : '/api';
+    
+    app.use(`${apiPrefix}/auth`, authRoutes);
+    app.use(`${apiPrefix}/posts`, postRoutes);
+    app.use(`${apiPrefix}/comments`, commentRoutes);
+    app.use(`${apiPrefix}/users`, userRoutes);
+    app.use(`${apiPrefix}/upload`, uploadRoutes);
+    app.use(`${apiPrefix}/email`, emailRoutes);
+    app.use(`${apiPrefix}/messages`, messageRoutes);
+    app.use(`${apiPrefix}/admin`, adminRoutes);
+    
+    routesLoaded = true;
+    console.log(`✅ 모든 라우터 등록 완료 (prefix: "${apiPrefix || '/'}")`);
+    console.log(`   - ${apiPrefix || '/'}/auth`);
+    console.log(`   - ${apiPrefix || '/'}/posts`);
+    console.log(`   - ${apiPrefix || '/'}/comments`);
+    console.log(`   - ${apiPrefix || '/'}/users`);
+    console.log(`   - ${apiPrefix || '/'}/upload`);
+    console.log(`   - ${apiPrefix || '/'}/email`);
+    console.log(`   - ${apiPrefix || '/'}/messages`);
+    console.log(`   - ${apiPrefix || '/'}/admin`);
+  } catch (error) {
+    routeLoadError = error;
+    console.error('❌ 라우트 로딩 실패:', error.message);
+    console.error(error.stack);
+    
+    if (isProduction) {
+      console.error('⚠️ 가능한 원인:');
+      console.error('   1. MongoDB 연결 실패 → MONGODB_URI 환경 변수 확인');
+      console.error('   2. 모델 로딩 실패 → 의존성 패키지 확인');
+      console.error('   3. 미들웨어 초기화 실패 → JWT_SECRET 환경 변수 확인');
+    }
   }
 }
+
+// 라우트 로딩 (비동기)
+loadRoutes();
 
 // OAuth 라우트 (환경 변수가 설정된 경우에만)
 if (process.env.GOOGLE_CLIENT_ID || process.env.GITHUB_CLIENT_ID) {
@@ -320,10 +331,12 @@ app.use((req, res, next) => {
   if (!routesLoaded && isProduction) {
     response.hint = '라우트가 로딩되지 않았습니다. 환경 변수를 확인하세요.';
     response.missingEnvVars = missingEnvVars;
+    response.routeLoadError = routeLoadError ? routeLoadError.message : null;
     response.troubleshooting = [
       '1. Vercel Dashboard → Settings → Environment Variables',
       '2. 최소 필수 변수: MONGODB_URI, JWT_SECRET, CLIENT_URL',
-      '3. 설정 후 Deployments → Redeploy 클릭'
+      '3. 설정 후 Deployments → Redeploy 클릭',
+      '4. Vercel Function Logs에서 상세 에러 확인'
     ];
   }
   

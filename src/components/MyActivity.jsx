@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { buildApiUrl } from '../utils/apiUrl';
 import './MyActivity.css';
 import MessageForm from './MessageForm';
 
@@ -63,7 +64,7 @@ const MyActivity = ({
     const fetchScraps = async () => {
       if (currentUser && currentUser._id) {
         try {
-          const response = await fetch(`${API_URL}/users/${currentUser._id}/scraps`, {
+          const response = await fetch(buildApiUrl(`/users/${currentUser._id}/scraps`), {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
@@ -92,7 +93,7 @@ const MyActivity = ({
     if (currentUser) {
       try {
         // 받은 메시지
-        const receivedRes = await fetch(`${API_URL}/messages`, {
+        const receivedRes = await fetch(buildApiUrl('/messages'), {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
@@ -104,7 +105,7 @@ const MyActivity = ({
         }
 
         // 보낸 메시지
-        const sentRes = await fetch(`${API_URL}/messages/sent`, {
+        const sentRes = await fetch(buildApiUrl('/messages/sent'), {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
@@ -129,7 +130,7 @@ const MyActivity = ({
   // 메시지 삭제
   const handleDeleteMessage = async (messageId) => {
     try {
-      const response = await fetch(`${API_URL}/messages/${messageId}`, {
+      const response = await fetch(buildApiUrl(`/messages/${messageId}`), {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`

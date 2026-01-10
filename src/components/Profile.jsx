@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { buildApiUrl } from '../utils/apiUrl';
 import './Profile.css';
 
 function Profile({ onClose }) {
@@ -42,7 +43,7 @@ function Profile({ onClose }) {
 
     try {
       // 백엔드 API로 비밀번호 확인 및 계정 삭제
-      const response = await fetch(`${API_URL}/auth/verify-password`, {
+      const response = await fetch(buildApiUrl('/auth/verify-password'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -82,7 +83,7 @@ function Profile({ onClose }) {
 
     // 사용자명 중복 체크
     try {
-      const checkResponse = await fetch(`${API_URL}/auth/check-username`, {
+      const checkResponse = await fetch(buildApiUrl('/auth/check-username'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -102,7 +103,7 @@ function Profile({ onClose }) {
     }
 
     try {
-      const response = await fetch(`${API_URL}/auth/verify-password`, {
+      const response = await fetch(buildApiUrl('/auth/verify-password'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -118,7 +119,7 @@ function Profile({ onClose }) {
       }
 
       // 비밀번호 확인 후 사용자명 업데이트
-      const updateResponse = await fetch(`${API_URL}/users/${currentUser.id}`, {
+      const updateResponse = await fetch(buildApiUrl(`/users/${currentUser.id}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -164,7 +165,7 @@ function Profile({ onClose }) {
 
     // 백엔드 API로 현재 비밀번호 확인
     try {
-      const verifyResponse = await fetch(`${API_URL}/auth/verify-password`, {
+      const verifyResponse = await fetch(buildApiUrl('/auth/verify-password'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -198,7 +199,7 @@ function Profile({ onClose }) {
       };
 
       // 백엔드 API로 비밀번호 업데이트
-      const response = await fetch(`${API_URL}/users/${currentUser.id}`, {
+      const response = await fetch(buildApiUrl(`/users/${currentUser.id}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

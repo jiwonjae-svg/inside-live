@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { buildApiUrl } from '../utils/apiUrl';
 import './MessageForm.css';
 
 function MessageForm({ currentUser, onClose, onSendMessage, initialRecipient = '' }) {
@@ -54,7 +55,7 @@ function MessageForm({ currentUser, onClose, onSendMessage, initialRecipient = '
 
       for (const recip of recipients) {
         try {
-          const response = await fetch(`${API_URL}/messages`, {
+          const response = await fetch(buildApiUrl('/messages'), {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
