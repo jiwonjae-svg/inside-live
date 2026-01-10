@@ -187,7 +187,20 @@ app.get('/api', (req, res) => {
   });
 });
 
+// 환경 변수 검증
+const missingEnvVars = [];
+if (!process.env.MONGODB_URI) missingEnvVars.push('MONGODB_URI');
+if (!process.env.JWT_SECRET) missingEnvVars.push('JWT_SECRET');
+if (!process.env.CLIENT_URL) missingEnvVars.push('CLIENT_URL');
+
+if (missingEnvVars.length > 0 && isProduction) {
+  console.error(`❌ 필수 환경 변수 누락: ${missingEnvVars.join(', ')}`);
+  console.error('⚠️ Vercel Dashboard → Settings → Environment Variables에서 설정하세요');
+  console.error('⚠️ 설정 후 Redeploy 필요');
+}
+
 // 라우트 안전하게 로드
+let routesLoaded = false;
 try {
   const authRoutes = require('./routes/auth');
   const postRoutes = require('./routes/posts');
@@ -212,10 +225,26 @@ try {
   app.use(`${apiPrefix}/messages`, messageRoutes);
   app.use(`${apiPrefix}/admin`, adminRoutes);
   
+  routesLoaded = true;
   console.log(`✅ 모든 라우터 등록 완료 (prefix: "${apiPrefix || '/'}")`);
+  console.log(`   - ${apiPrefix || '/'}/auth`);
+  console.log(`   - ${apiPrefix || '/'}/posts`);
+  console.log(`   - ${apiPrefix || '/'}/comments`);
+  console.log(`   - ${apiPrefix || '/'}/users`);
+  console.log(`   - ${apiPrefix || '/'}/upload`);
+  console.log(`   - ${apiPrefix || '/'}/email`);
+  console.log(`   - ${apiPrefix || '/'}/messages`);
+  console.log(`   - ${apiPrefix || '/'}/admin`);
 } catch (error) {
   console.error('❌ 라우트 로딩 실패:', error.message);
   console.error(error.stack);
+  
+  if (isProduction) {
+    console.error('⚠️ 가능한 원인:');
+    console.error('   1. MongoDB 연결 실패 → MONGODB_URI 환경 변수 확인');
+    console.error('   2. 모델 로딩 실패 → 의존성 패키지 확인');
+    console.error('   3. 미들웨어 초기화 실패 → JWT_SECRET 환경 변수 확인');
+  }
 }
 
 // OAuth 라우트 (환경 변수가 설정된 경우에만)
@@ -279,12 +308,26 @@ if (process.env.GOOGLE_CLIENT_ID || process.env.GITHUB_CLIENT_ID) {
 // 404 핸들러 (모든 라우트 이후)
 app.use((req, res, next) => {
   console.log(`⚠️ 404 Not Found: ${req.method} ${req.path}`);
-  res.status(404).json({ 
+  
+  const response = { 
     error: 'Not Found',
     message: `경로를 찾을 수 없습니다: ${req.path}`,
     method: req.method,
     path: req.path
-  });
+  };
+  
+  // 라우트가 로딩되지 않았거나 환경 변수가 누락된 경우 추가 정보 제공
+  if (!routesLoaded && isProduction) {
+    response.hint = '라우트가 로딩되지 않았습니다. 환경 변수를 확인하세요.';
+    response.missingEnvVars = missingEnvVars;
+    response.troubleshooting = [
+      '1. Vercel Dashboard → Settings → Environment Variables',
+      '2. 최소 필수 변수: MONGODB_URI, JWT_SECRET, CLIENT_URL',
+      '3. 설정 후 Deployments → Redeploy 클릭'
+    ];
+  }
+  
+  res.status(404).json(response);
 });
 
 // 에러 핸들링
